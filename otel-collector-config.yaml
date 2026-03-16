@@ -1,0 +1,103 @@
+# OpenTelemetry Collector 設定
+#
+# パイプライン構成:
+#   Receiver  -> OTLP (HTTP/gRPC) で PHP SDK からテレメトリを受信
+#   Processor -> バッチ処理・リソース属性付与
+#   Exporter  -> Jaeger (Trace) / Prometheus (Metrics) / Loki (Logs)
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+        cors:
+          allowed_origins:
+            - "http://*"
+            - "https://*"
+
+processors:
+  # バッチ処理: エクスポートをまとめて効率化
+  batch:
+    timeout: 1s
+    send_batch_size: 1024
+
+  # メモリリミッター: OOM 防止
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 512
+    spike_limit_mib: 128
+
+  # リソース属性の追加・変換
+  resource:
+    attributes:
+      - key: collector.version
+        value: "0.96.0"
+        action: insert
+
+exporters:
+  # Jaeger: トレース可視化
+  otlp/jaeger:
+    endpoint: jaeger:4317
+    tls:
+      insecure: true
+
+  # Prometheus: メトリクス収集
+  prometheus:
+    endpoint: 0.0.0.0:8889
+    namespace: otel
+    enable_open_metrics: true
+    resource_to_telemetry_conversion:
+      enabled: true
+
+  # Loki: ログ収集
+  loki:
+    endpoint: http://loki:3100/loki/api/v1/push
+    default_labels_enabled:
+      exporter: true
+      job: true
+      instance: true
+      level: true
+
+  # デバッグ出力 (開発時のみ)
+  debug:
+    verbosity: basic
+    sampling_initial: 5
+    sampling_thereafter: 200
+
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+  pprof:
+    endpoint: 0.0.0.0:1777
+  zpages:
+    endpoint: 0.0.0.0:55679
+
+service:
+  extensions: [health_check, pprof, zpages]
+
+  pipelines:
+    # トレースパイプライン
+    traces:
+      receivers:  [otlp]
+      processors: [memory_limiter, batch]
+      exporters:  [otlp/jaeger, debug]
+
+    # メトリクスパイプライン
+    metrics:
+      receivers:  [otlp]
+      processors: [memory_limiter, batch, resource]
+      exporters:  [prometheus, debug]
+
+    # ログパイプライン
+    logs:
+      receivers:  [otlp]
+      processors: [memory_limiter, batch]
+      exporters:  [loki, debug]
+
+  telemetry:
+    logs:
+      level: warn
+    metrics:
+      address: 0.0.0.0:8888
