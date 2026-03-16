@@ -1,6 +1,6 @@
 # OpenTelemetry PHP APM デモ
 
-PHPカンファレンス向け OpenTelemetry PHP SDK の実装サンプルです。
+PHPerKaigi 2026 で使用する OpenTelemetry PHP SDK の実装サンプルです。
 Traces / Metrics / Logs の **3シグナル** を実際のコードで示します。
 
 ## アーキテクチャ
