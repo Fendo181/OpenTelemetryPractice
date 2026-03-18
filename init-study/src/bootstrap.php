@@ -15,7 +15,7 @@ use Monolog\Logger;
 use OpenTelemetry\API\Globals;
 use OpenTelemetry\API\Logs\EventLogger;
 use OpenTelemetry\Contrib\Otlp\LogsExporter;
-use OpenTelemetry\Contrib\Otlp\MetricsExporter;
+use OpenTelemetry\Contrib\Otlp\MetricExporter;
 use OpenTelemetry\Contrib\Otlp\SpanExporter;
 use OpenTelemetry\SDK\Common\Attribute\Attributes;
 use OpenTelemetry\SDK\Common\Export\Http\PsrTransportFactory;
@@ -82,7 +82,7 @@ $metricsTransport = $transportFactory->create(
     $collectorEndpoint . '/v1/metrics',
     'application/x-protobuf'
 );
-$metricsExporter = new MetricsExporter($metricsTransport);
+$metricsExporter = new MetricExporter($metricsTransport);
 
 $meterProvider = MeterProvider::builder()
     ->setResource($resource)
@@ -98,10 +98,10 @@ $logsTransport = $transportFactory->create(
 );
 $logsExporter = new LogsExporter($logsTransport);
 
-$loggerProvider = new LoggerProvider(
-    processor: new SimpleLogRecordProcessor($logsExporter),
-    resource:  $resource,
-);
+$loggerProvider = LoggerProvider::builder()
+    ->setResource($resource)
+    ->addLogRecordProcessor(new SimpleLogRecordProcessor($logsExporter))
+    ->build();
 
 // ----------------------------------------------------------------
 // グローバル登録

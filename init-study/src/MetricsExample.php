@@ -98,7 +98,7 @@ class MetricsExample
                 unit:        'By',
                 description: 'PHPプロセスのメモリ使用量'
             )
-            ->observe(function (ObserverInterface $observer): void {
+            ->observe(static function (ObserverInterface $observer): void {
                 $observer->observe(memory_get_usage(true), [
                     'process.pid' => getmypid(),
                 ]);
@@ -111,7 +111,7 @@ class MetricsExample
                 unit:        's',
                 description: 'プロセスのCPU使用時間（累積）'
             )
-            ->observe(function (ObserverInterface $observer): void {
+            ->observe(static function (ObserverInterface $observer): void {
                 $usage = getrusage();
                 $observer->observe(
                     ($usage['ru_utime.tv_sec'] ?? 0) + ($usage['ru_utime.tv_usec'] ?? 0) / 1_000_000,
