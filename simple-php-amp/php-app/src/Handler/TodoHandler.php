@@ -22,9 +22,12 @@ class TodoHandler
 {
     private TodoRepository $repository;
 
-    public function __construct()
+    /**
+     * @param TodoRepository|null $repository テスト時にモックを注入できる（t_wada TDD: 依存性注入によるセアム）
+     */
+    public function __construct(?TodoRepository $repository = null)
     {
-        $this->repository = new TodoRepository();
+        $this->repository = $repository ?? new TodoRepository();
     }
 
     /**
@@ -87,8 +90,8 @@ class TodoHandler
         $logger = TelemetryInitializer::getLogger();
         $logger->info('Todo作成リクエストを受信', ['input' => $input]);
 
-        // バリデーション（タイトル必須）
-        if (empty($input['title'] ?? '')) {
+        // バリデーション（タイトル必須・空白のみも無効）
+        if (empty(trim($input['title'] ?? ''))) {
             $logger->error('バリデーションエラー: タイトルが空です');
             http_response_code(400);
             return [

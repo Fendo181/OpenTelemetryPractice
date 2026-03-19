@@ -24,8 +24,16 @@ class TodoRepository
 {
     private \PDO $db;
 
-    public function __construct()
+    /**
+     * @param \PDO|null $db テスト時にインメモリSQLiteを注入できる（t_wada TDD: 依存性注入によるセアム）
+     */
+    public function __construct(?\PDO $db = null)
     {
+        if ($db !== null) {
+            $this->db = $db;
+            return;
+        }
+
         // SQLiteデータベース接続
         $dbPath = __DIR__ . '/../../database/todos.db';
         $this->db = new \PDO("sqlite:{$dbPath}");
