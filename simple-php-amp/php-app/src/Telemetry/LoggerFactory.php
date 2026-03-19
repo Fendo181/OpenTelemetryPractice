@@ -9,6 +9,9 @@ use OpenTelemetry\SDK\Resource\ResourceInfo;
 use OpenTelemetry\SDK\Resource\ResourceInfoFactory;
 use OpenTelemetry\SDK\Common\Attribute\Attributes;
 use OpenTelemetry\Contrib\Otlp\LogsExporter;
+use OpenTelemetry\Contrib\Otlp\OtlpHttpTransportFactory;
+use OpenTelemetry\Contrib\Otlp\ContentTypes;
+use OpenTelemetry\Contrib\Otlp\HttpEndpointResolver;
 use OpenTelemetry\API\Signals;
 
 /**
@@ -37,12 +40,10 @@ class LoggerFactory
     {
         // 1. OTLP HTTP Logs Exporter の設定
         // CollectorにHTTPでログを送信する。エンドポイントは /v1/logs
-        $exporter = new LogsExporter(
-            \OpenTelemetry\Contrib\Otlp\HttpEndpointResolver::create(
-                getenv('OTEL_EXPORTER_OTLP_ENDPOINT') ?: 'http://otel-collector:4318',
-                Signals::LOGS
-            )
-        );
+        $baseEndpoint = getenv('OTEL_EXPORTER_OTLP_ENDPOINT') ?: 'http://otel-collector:4318';
+        $endpoint  = HttpEndpointResolver::create()->resolveToString($baseEndpoint, Signals::LOGS);
+        $transport = (new OtlpHttpTransportFactory())->create($endpoint, ContentTypes::PROTOBUF);
+        $exporter  = new LogsExporter($transport);
 
         // 2. BatchLogRecordProcessor - ログを溜めて効率的に送信
         // Spanと同じくバッチ処理する。ログは量が多いのでバッチ化が重要。

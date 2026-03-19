@@ -9,6 +9,9 @@ use OpenTelemetry\SDK\Resource\ResourceInfo;
 use OpenTelemetry\SDK\Resource\ResourceInfoFactory;
 use OpenTelemetry\SDK\Common\Attribute\Attributes;
 use OpenTelemetry\Contrib\Otlp\MetricExporter;
+use OpenTelemetry\Contrib\Otlp\OtlpHttpTransportFactory;
+use OpenTelemetry\Contrib\Otlp\ContentTypes;
+use OpenTelemetry\Contrib\Otlp\HttpEndpointResolver;
 use OpenTelemetry\API\Signals;
 
 /**
@@ -37,12 +40,10 @@ class MeterFactory
     {
         // 1. OTLP HTTP Metric Exporter の設定
         // CollectorにHTTPでメトリクスを送信する。エンドポイントは /v1/metrics
-        $exporter = new MetricExporter(
-            \OpenTelemetry\Contrib\Otlp\HttpEndpointResolver::create(
-                getenv('OTEL_EXPORTER_OTLP_ENDPOINT') ?: 'http://otel-collector:4318',
-                Signals::METRICS
-            )
-        );
+        $baseEndpoint = getenv('OTEL_EXPORTER_OTLP_ENDPOINT') ?: 'http://otel-collector:4318';
+        $endpoint  = HttpEndpointResolver::create()->resolveToString($baseEndpoint, Signals::METRICS);
+        $transport = (new OtlpHttpTransportFactory())->create($endpoint, ContentTypes::PROTOBUF);
+        $exporter  = new MetricExporter($transport);
 
         // 2. PeriodicExportingMetricReader - 定期的にメトリクスをエクスポート
         // 60秒間隔でメトリクスを集約して送信する。

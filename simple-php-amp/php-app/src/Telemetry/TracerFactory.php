@@ -10,6 +10,9 @@ use OpenTelemetry\SDK\Resource\ResourceInfo;
 use OpenTelemetry\SDK\Resource\ResourceInfoFactory;
 use OpenTelemetry\SDK\Common\Attribute\Attributes;
 use OpenTelemetry\Contrib\Otlp\SpanExporter;
+use OpenTelemetry\Contrib\Otlp\OtlpHttpTransportFactory;
+use OpenTelemetry\Contrib\Otlp\ContentTypes;
+use OpenTelemetry\Contrib\Otlp\HttpEndpointResolver;
 use OpenTelemetry\API\Signals;
 
 /**
@@ -37,12 +40,10 @@ class TracerFactory
     {
         // 1. OTLP HTTP Exporter の設定
         // CollectorにHTTPでトレースを送信する。エンドポイントは /v1/traces
-        $exporter = new SpanExporter(
-            \OpenTelemetry\Contrib\Otlp\HttpEndpointResolver::create(
-                getenv('OTEL_EXPORTER_OTLP_ENDPOINT') ?: 'http://otel-collector:4318',
-                Signals::TRACE
-            )
-        );
+        $baseEndpoint = getenv('OTEL_EXPORTER_OTLP_ENDPOINT') ?: 'http://otel-collector:4318';
+        $endpoint  = HttpEndpointResolver::create()->resolveToString($baseEndpoint, Signals::TRACE);
+        $transport = (new OtlpHttpTransportFactory())->create($endpoint, ContentTypes::PROTOBUF);
+        $exporter  = new SpanExporter($transport);
 
         // 2. BatchSpanProcessor - Spanを溜めて効率的に送信
         // リアルタイムで1個ずつ送るとオーバーヘッドが大きいため、バッチ化する。
