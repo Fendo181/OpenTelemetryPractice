@@ -3,6 +3,7 @@
 namespace SimplePhpApm\Telemetry;
 
 use OpenTelemetry\API\Globals;
+use OpenTelemetry\API\Instrumentation\Configurator;
 use OpenTelemetry\API\Logs\LoggerProviderInterface;
 use OpenTelemetry\API\Metrics\MeterProviderInterface;
 use OpenTelemetry\API\Trace\TracerProviderInterface;
@@ -40,15 +41,23 @@ class TelemetryInitializer
     {
         // 1. Tracer Provider - 分散トレーシング（Spans）
         self::$tracerProvider = TracerFactory::create();
-        Globals::registerInitialTracerProvider(self::$tracerProvider);
 
         // 2. Meter Provider - メトリクス（Counter/Histogram/Gauge）
         self::$meterProvider = MeterFactory::create();
-        Globals::registerInitialMeterProvider(self::$meterProvider);
 
         // 3. Logger Provider - 構造化ログ（Trace-Log相関）
         self::$loggerProvider = LoggerFactory::create();
-        Globals::registerInitialLoggerProvider(self::$loggerProvider);
+
+        // 新API: registerInitializer() でまとめて登録（旧: registerInitialXxxProvider は廃止）
+        $tracerProvider = self::$tracerProvider;
+        $meterProvider  = self::$meterProvider;
+        $loggerProvider = self::$loggerProvider;
+        Globals::registerInitializer(static function (Configurator $configurator) use ($tracerProvider, $meterProvider, $loggerProvider): Configurator {
+            return $configurator
+                ->withTracerProvider($tracerProvider)
+                ->withMeterProvider($meterProvider)
+                ->withLoggerProvider($loggerProvider);
+        });
 
         // PSR-3 ロガーを OtelLoggerBridge でラップ（info() / warning() / error() 対応）
         $otelLogger = self::$loggerProvider->getLogger('simple-php-apm', '1.0.0');
