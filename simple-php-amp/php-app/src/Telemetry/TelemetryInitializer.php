@@ -6,6 +6,7 @@ use OpenTelemetry\API\Globals;
 use OpenTelemetry\API\Logs\LoggerProviderInterface;
 use OpenTelemetry\API\Metrics\MeterProviderInterface;
 use OpenTelemetry\API\Trace\TracerProviderInterface;
+use Psr\Log\LoggerInterface;
 
 /**
  * TelemetryInitializer - OpenTelemetry 3シグナルの初期化を集約
@@ -23,6 +24,9 @@ class TelemetryInitializer
     private static ?TracerProviderInterface $tracerProvider = null;
     private static ?MeterProviderInterface $meterProvider = null;
     private static ?LoggerProviderInterface $loggerProvider = null;
+
+    /** PSR-3 ロガー（OtelLoggerBridge を使って OTel に送信） */
+    private static ?LoggerInterface $logger = null;
 
     /**
      * すべてのTelemetryプロバイダーを初期化
@@ -45,6 +49,42 @@ class TelemetryInitializer
         // 3. Logger Provider - 構造化ログ（Trace-Log相関）
         self::$loggerProvider = LoggerFactory::create();
         Globals::registerInitialLoggerProvider(self::$loggerProvider);
+
+        // PSR-3 ロガーを OtelLoggerBridge でラップ（info() / warning() / error() 対応）
+        $otelLogger = self::$loggerProvider->getLogger('simple-php-apm', '1.0.0');
+        self::$logger = new OtelLoggerBridge($otelLogger);
+    }
+
+    /**
+     * テスト用の初期化メソッド（依存性注入）
+     *
+     * t_wada TDD: テストで外部依存をモックに差し替えるためのセアム（継ぎ目）
+     * テストコードからのみ呼び出すこと。
+     *
+     * @param TracerProviderInterface $tracerProvider トレーサーのモック
+     * @param MeterProviderInterface  $meterProvider  メーターのモック
+     * @param LoggerInterface         $logger         PSR-3 ロガーのモック
+     */
+    public static function initializeForTesting(
+        TracerProviderInterface $tracerProvider,
+        MeterProviderInterface $meterProvider,
+        LoggerInterface $logger
+    ): void {
+        self::$tracerProvider = $tracerProvider;
+        self::$meterProvider  = $meterProvider;
+        self::$loggerProvider = null;
+        self::$logger         = $logger;
+    }
+
+    /**
+     * テスト後のリセット（tearDown で呼び出す）
+     */
+    public static function reset(): void
+    {
+        self::$tracerProvider = null;
+        self::$meterProvider  = null;
+        self::$loggerProvider = null;
+        self::$logger         = null;
     }
 
     /**
@@ -78,18 +118,21 @@ class TelemetryInitializer
     }
 
     /**
-     * Loggerの取得
+     * PSR-3 ロガーの取得
      *
-     * @param string $name ロガー名
-     * @return \OpenTelemetry\API\Logs\LoggerInterface
+     * OtelLoggerBridge を通じて info() / warning() / error() などが利用でき、
+     * かつ OTel の Trace-Log 相関（Trace ID 自動付与）も維持される。
+     *
+     * @param string $name ロガー名（未使用。後方互換性のために残す）
+     * @return LoggerInterface PSR-3 ロガー
      */
-    public static function getLogger(string $name = 'simple-php-apm'): \OpenTelemetry\API\Logs\LoggerInterface
+    public static function getLogger(string $name = 'simple-php-apm'): LoggerInterface
     {
-        if (self::$loggerProvider === null) {
+        if (self::$logger === null) {
             throw new \RuntimeException('TelemetryInitializer::initialize() を先に呼び出してください');
         }
 
-        return self::$loggerProvider->getLogger($name, '1.0.0');
+        return self::$logger;
     }
 
     /**
