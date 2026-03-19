@@ -1,0 +1,64 @@
+# OpenTelemetry Collector設定
+# PHPerKaigi 2026デモ用 - 3シグナル(Traces/Metrics/Logs)のパイプライン設定
+
+receivers:
+  # OTLP HTTP Receiver - PHPアプリからテレメトリを受信
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4318  # PHPアプリからはこのエンドポイントに送信
+      grpc:
+        endpoint: 0.0.0.0:4317
+
+processors:
+  # Batchプロセッサ - 効率的な送信のためにデータをバッチ化
+  batch:
+    timeout: 10s
+    send_batch_size: 1024
+
+  # Resourceプロセッサ - すべてのテレメトリに共通属性を追加
+  resource:
+    attributes:
+      - key: deployment.environment
+        value: "phperkaigi-2026-demo"
+        action: insert
+
+exporters:
+  # Traces: Jaegerに送信
+  otlp/jaeger:
+    endpoint: jaeger:4317
+    tls:
+      insecure: true
+
+  # Metrics: Prometheusが取得できる形式で公開
+  prometheus:
+    endpoint: "0.0.0.0:8889"
+    namespace: simple_php_apm
+    const_labels:
+      service: "simple-php-apm"
+
+  # Logs: 標準出力にJSON形式で出力（デモ用）
+  logging:
+    loglevel: info
+    sampling_initial: 5
+    sampling_thereafter: 200
+
+service:
+  pipelines:
+    # Traces Pipeline: PHP → Collector → Jaeger
+    traces:
+      receivers: [otlp]
+      processors: [batch, resource]
+      exporters: [otlp/jaeger, logging]
+
+    # Metrics Pipeline: PHP → Collector → Prometheus
+    metrics:
+      receivers: [otlp]
+      processors: [batch, resource]
+      exporters: [prometheus, logging]
+
+    # Logs Pipeline: PHP → Collector → Console
+    logs:
+      receivers: [otlp]
+      processors: [batch, resource]
+      exporters: [logging]

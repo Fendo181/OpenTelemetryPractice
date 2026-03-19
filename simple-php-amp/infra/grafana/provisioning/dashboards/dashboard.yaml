@@ -1,0 +1,16 @@
+# Grafana Dashboard Provider設定
+# ダッシュボードを自動プロビジョニング
+
+apiVersion: 1
+
+providers:
+  - name: 'Simple PHP APM'
+    orgId: 1
+    folder: 'PHPerKaigi 2026'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards
+      foldersFromFilesStructure: true

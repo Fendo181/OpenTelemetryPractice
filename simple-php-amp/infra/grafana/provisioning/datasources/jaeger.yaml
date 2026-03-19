@@ -1,0 +1,17 @@
+# Grafana DataSource: Jaeger
+# トレーシングデータを可視化するためのデータソース
+
+apiVersion: 1
+
+datasources:
+  - name: Jaeger
+    type: jaeger
+    access: proxy
+    url: http://jaeger:16686
+    isDefault: false
+    editable: true
+    jsonData:
+      tracesToLogsV2:
+        # Trace-Log相関設定（将来拡張用）
+        datasourceUid: 'loki'
+        tags: ['trace_id']
