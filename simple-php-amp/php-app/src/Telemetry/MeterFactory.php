@@ -3,7 +3,7 @@
 namespace SimplePhpApm\Telemetry;
 
 use OpenTelemetry\API\Metrics\MeterProviderInterface;
-use OpenTelemetry\SDK\Metrics\MeterProvider;
+use OpenTelemetry\SDK\Metrics\MeterProviderBuilder;
 use OpenTelemetry\SDK\Metrics\MetricReader\ExportingReader;
 use OpenTelemetry\SDK\Resource\ResourceInfo;
 use OpenTelemetry\SDK\Resource\ResourceInfoFactory;
@@ -25,8 +25,6 @@ use OpenTelemetry\API\Signals;
  * - Histogram: http.request.duration（レスポンスタイムの分布）
  * - Gauge: process.memory.usage（PHPメモリ使用量）
  *
- * PrometheusがこれをスクレイプしてGrafanaで可視化する。
- *
  * PHPerKaigi 2026デモ用
  */
 class MeterFactory
@@ -45,16 +43,10 @@ class MeterFactory
         $transport = (new OtlpHttpTransportFactory())->create($endpoint, ContentTypes::PROTOBUF);
         $exporter  = new MetricExporter($transport);
 
-        // 2. PeriodicExportingMetricReader - 定期的にメトリクスをエクスポート
-        // 60秒間隔でメトリクスを集約して送信する。
-        // Tracesとの違い: Tracesはリクエストごと、Metricsは時間ごと。
-        $reader = new ExportingReader(
-            $exporter,
-            \OpenTelemetry\SDK\Common\Time\ClockFactory::getDefault()
-        );
+        // 2. ExportingReader - 定期的にメトリクスをエクスポート
+        $reader = new ExportingReader($exporter);
 
         // 3. Resource Attributes - サービスのメタデータ
-        // Tracesと同じservice.nameを使うことで、相関が取れる。
         $resource = ResourceInfoFactory::emptyResource()->merge(
             ResourceInfo::create(
                 Attributes::create([
@@ -65,14 +57,10 @@ class MeterFactory
             )
         );
 
-        // 4. MeterProvider の生成
-        // Meter（Counter/Histogram/Gaugeを作るAPI）を提供する。
-        return new MeterProvider(
-            null,      // ViewRegistryは使わない（デフォルト）
-            $resource, // リソース属性
-            \OpenTelemetry\SDK\Common\Time\ClockFactory::getDefault(),
-            null,      // Exemplar Filter（デフォルト）
-            [$reader]  // MetricReaderの配列
-        );
+        // 4. MeterProvider の生成（Builder パターンで安全に構築）
+        return (new MeterProviderBuilder())
+            ->setResource($resource)
+            ->addReader($reader)
+            ->build();
     }
 }

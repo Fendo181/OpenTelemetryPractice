@@ -4,7 +4,8 @@ namespace SimplePhpApm\Telemetry;
 
 use OpenTelemetry\API\Logs\LoggerProviderInterface;
 use OpenTelemetry\SDK\Logs\LoggerProvider;
-use OpenTelemetry\SDK\Logs\LogRecordProcessor\BatchLogRecordProcessor;
+use OpenTelemetry\SDK\Logs\LoggerProviderBuilder;
+use OpenTelemetry\SDK\Logs\Processor\BatchLogRecordProcessor;
 use OpenTelemetry\SDK\Resource\ResourceInfo;
 use OpenTelemetry\SDK\Resource\ResourceInfoFactory;
 use OpenTelemetry\SDK\Common\Attribute\Attributes;
@@ -25,8 +26,6 @@ use OpenTelemetry\API\Signals;
  * - 構造化ログ（JSON形式でkey-valueペア）
  * - OTLP経由でCollectorに送信
  *
- * 商用APMは、このTrace IDを使ってログからトレース詳細に遷移できる。
- *
  * PHPerKaigi 2026デモ用
  */
 class LoggerFactory
@@ -46,14 +45,12 @@ class LoggerFactory
         $exporter  = new LogsExporter($transport);
 
         // 2. BatchLogRecordProcessor - ログを溜めて効率的に送信
-        // Spanと同じくバッチ処理する。ログは量が多いのでバッチ化が重要。
         $logProcessor = new BatchLogRecordProcessor(
             $exporter,
             \OpenTelemetry\SDK\Common\Time\ClockFactory::getDefault()
         );
 
         // 3. Resource Attributes - サービスのメタデータ
-        // Traces/Metricsと同じservice.nameで統一。これが3シグナル相関の鍵。
         $resource = ResourceInfoFactory::emptyResource()->merge(
             ResourceInfo::create(
                 Attributes::create([
@@ -64,11 +61,10 @@ class LoggerFactory
             )
         );
 
-        // 4. LoggerProvider の生成
-        // Logger（構造化ログを出力するAPI）を提供する。
-        return new LoggerProvider(
-            [$logProcessor],  // LogRecordProcessorの配列
-            $resource         // リソース属性
-        );
+        // 4. LoggerProvider の生成（Builder パターンで安全に構築）
+        return LoggerProvider::builder()
+            ->setResource($resource)
+            ->addLogRecordProcessor($logProcessor)
+            ->build();
     }
 }

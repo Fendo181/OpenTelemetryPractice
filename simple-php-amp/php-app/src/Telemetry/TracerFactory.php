@@ -3,7 +3,7 @@
 namespace SimplePhpApm\Telemetry;
 
 use OpenTelemetry\API\Trace\TracerProviderInterface;
-use OpenTelemetry\SDK\Trace\TracerProvider;
+use OpenTelemetry\SDK\Trace\TracerProviderBuilder;
 use OpenTelemetry\SDK\Trace\SpanProcessor\BatchSpanProcessor;
 use OpenTelemetry\SDK\Trace\Sampler\AlwaysOnSampler;
 use OpenTelemetry\SDK\Resource\ResourceInfo;
@@ -47,21 +47,13 @@ class TracerFactory
 
         // 2. BatchSpanProcessor - Spanを溜めて効率的に送信
         // リアルタイムで1個ずつ送るとオーバーヘッドが大きいため、バッチ化する。
-        // 商用APMもこの仕組みを使っている。
         $spanProcessor = new BatchSpanProcessor(
             $exporter,
             \OpenTelemetry\SDK\Common\Time\ClockFactory::getDefault()
         );
 
-        // 3. Sampler - サンプリング戦略
-        // AlwaysOnSampler: 全リクエストをトレース（デモ用）
-        // 本番環境では ParentBasedSampler + TraceIdRatioBasedSampler を使う。
-        // 例: 1%だけトレースして負荷を減らす
-        $sampler = new AlwaysOnSampler();
-
-        // 4. Resource Attributes - サービスのメタデータ
+        // 3. Resource Attributes - サービスのメタデータ
         // service.name はトレースを識別するための最重要属性。
-        // JaegerやGrafanaでサービスごとにフィルタできる。
         $resource = ResourceInfoFactory::emptyResource()->merge(
             ResourceInfo::create(
                 Attributes::create([
@@ -72,12 +64,11 @@ class TracerFactory
             )
         );
 
-        // 5. TracerProvider の生成
-        // これがTracer（Spanを作るAPI）を提供する。
-        return new TracerProvider(
-            [$spanProcessor],  // SpanProcessorの配列（複数設定可能）
-            $sampler,          // サンプリング戦略
-            $resource          // リソース属性
-        );
+        // 4. TracerProvider の生成（Builder パターンで安全に構築）
+        return (new TracerProviderBuilder())
+            ->setResource($resource)
+            ->setSampler(new AlwaysOnSampler())
+            ->addSpanProcessor($spanProcessor)
+            ->build();
     }
 }
