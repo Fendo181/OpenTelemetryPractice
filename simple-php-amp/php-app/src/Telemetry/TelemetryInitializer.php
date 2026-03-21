@@ -34,8 +34,6 @@ class TelemetryInitializer
      *
      * このメソッドは毎リクエスト呼び出す必要がある。
      * PHPはリクエスト終了時にすべてのメモリをクリアするため、シングルトンは意味を持たない。
-     *
-     * 重要: このコストが商用APMとの最大の違い。PHP拡張機能ならプロセス起動時1回だけでOK。
      */
     public static function initialize(): void
     {
@@ -48,7 +46,7 @@ class TelemetryInitializer
         // 3. Logger Provider - 構造化ログ（Trace-Log相関）
         self::$loggerProvider = LoggerFactory::create();
 
-        // 新API: registerInitializer() でまとめて登録（旧: registerInitialXxxProvider は廃止）
+        // 新API: registerInitializer() でまとめて登録
         $tracerProvider = self::$tracerProvider;
         $meterProvider  = self::$meterProvider;
         $loggerProvider = self::$loggerProvider;
