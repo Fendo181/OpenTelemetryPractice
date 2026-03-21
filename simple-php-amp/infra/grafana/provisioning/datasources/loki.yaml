@@ -1,0 +1,21 @@
+# Grafana DataSource: Loki
+# ログデータを可視化するためのデータソース
+# Jaeger の tracesToLogsV2 設定（datasourceUid: 'loki'）と連携してTrace-Log相関を実現
+
+apiVersion: 1
+
+datasources:
+  - name: Loki
+    type: loki
+    uid: loki
+    access: proxy
+    url: http://loki:3100
+    isDefault: false
+    editable: true
+    jsonData:
+      derivedFields:
+        # Trace ID からJaegerへのリンクを自動生成
+        - name: TraceID
+          matcherRegex: '"trace_id":"(\w+)"'
+          url: '$${__value.raw}'
+          datasourceUid: jaeger

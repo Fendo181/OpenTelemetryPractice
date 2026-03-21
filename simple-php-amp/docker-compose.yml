@@ -67,6 +67,19 @@ services:
     networks:
       - apm-network
 
+  # Loki - ログ集約・保存
+  loki:
+    image: grafana/loki:latest
+    container_name: loki
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./infra/loki/loki-config.yaml:/etc/loki/local-config.yaml
+      - loki-data:/loki
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - apm-network
+
   # Grafana - 可視化ダッシュボード
   grafana:
     image: grafana/grafana:latest
@@ -83,6 +96,7 @@ services:
     depends_on:
       - prometheus
       - jaeger
+      - loki
     networks:
       - apm-network
 
@@ -93,3 +107,4 @@ networks:
 volumes:
   prometheus-data:
   grafana-data:
+  loki-data:

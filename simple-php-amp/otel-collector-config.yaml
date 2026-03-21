@@ -1,6 +1,3 @@
-# OpenTelemetry Collector設定
-# PHPerKaigi 2026デモ用 - 3シグナル(Traces/Metrics/Logs)のパイプライン設定
-
 receivers:
   # OTLP HTTP Receiver - PHPアプリからテレメトリを受信
   otlp:
@@ -38,10 +35,14 @@ exporters:
       service: "simple-php-apm"
 
   # Logs: 標準出力にJSON形式で出力（デモ用）
-  logging:
-    loglevel: info
+  debug:
+    verbosity: normal
     sampling_initial: 5
     sampling_thereafter: 200
+
+  # Logs: LokiにOTLP形式で送信
+  otlphttp/loki:
+    endpoint: http://loki:3100/otlp
 
 service:
   pipelines:
@@ -49,16 +50,16 @@ service:
     traces:
       receivers: [otlp]
       processors: [batch, resource]
-      exporters: [otlp/jaeger, logging]
+      exporters: [otlp/jaeger, debug]
 
     # Metrics Pipeline: PHP → Collector → Prometheus
     metrics:
       receivers: [otlp]
       processors: [batch, resource]
-      exporters: [prometheus, logging]
+      exporters: [prometheus, debug]
 
-    # Logs Pipeline: PHP → Collector → Console
+    # Logs Pipeline: PHP → Collector → Loki + Console
     logs:
       receivers: [otlp]
       processors: [batch, resource]
-      exporters: [logging]
+      exporters: [debug, otlphttp/loki]
