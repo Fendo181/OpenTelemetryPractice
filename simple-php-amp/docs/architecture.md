@@ -1,4 +1,4 @@
-# OpenTelemetry アーキテクチャ ドキュメント
+# simple-php-amp Architecture
 
 ## 概要
 
