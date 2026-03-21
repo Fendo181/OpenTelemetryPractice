@@ -29,8 +29,8 @@ graph TB
     subgraph "バックエンド"
         JAEGER[Jaeger UI<br/>port:16686]
         PROM[Prometheus<br/>port:9090]
+        LOKI[Loki<br/>port:3100]
         GRAFANA[Grafana<br/>port:3000]
-        STDOUT[Collector stdout<br/>JSON形式]
     end
 
     APP --> INIT
@@ -48,8 +48,10 @@ graph TB
 
     COL -- "Traces" --> JAEGER
     COL -- "Metrics" --> PROM
-    COL -- "Logs" --> STDOUT
+    COL -- "Logs" --> LOKI
     PROM --> GRAFANA
+    LOKI --> GRAFANA
+    JAEGER --> GRAFANA
 ```
 
 ---
@@ -220,15 +222,33 @@ flowchart TD
 
     OTLP_L --> COL_L["OpenTelemetry Collector\n⑪ otlphttp receiver 受信"]
 
-    COL_L --> STDOUT["logging exporter\n⑫ 標準出力(JSON形式)"]
+    COL_L --> DEBUG["debug exporter\n⑫ 標準出力(JSON形式)\n  ※デバッグ確認用"]
 
-    STDOUT --> OUT([Collector コンソール出力\n※本番では Loki 等へ転送])
+    COL_L --> LOKI_EXP["otlp_http/loki exporter\n⑫ POST /otlp/v1/logs\n  → loki:3100"]
+
+    LOKI_EXP --> LOKI["Loki :3100\n⑬ ログ保存・インデックス化\n  ラベル: service_name\n         deployment_environment"]
+
+    LOKI --> GRAFANA_L["Grafana :3000\n⑭ Explore → Loki でログ検索\n  Trace-Log 相関も可能"]
 
     style REQ fill:#4CAF50,color:#fff
-    style OUT fill:#2196F3,color:#fff
+    style GRAFANA_L fill:#2196F3,color:#fff
     style BRIDGE fill:#FF5722,color:#fff
     style CORRELATION fill:#E91E63,color:#fff
+    style LOKI fill:#F06000,color:#fff
 ```
+
+### Trace-Log 相関（Jaeger ↔ Loki）
+
+ログには **Trace ID** が自動付与されるため、Grafana から Jaeger のトレースとログを紐づけて確認できます。
+
+```mermaid
+flowchart LR
+    LOG["Loki のログ\ntrace_id=abc123..."] -- "trace_idクリック" --> JAEGER["Jaeger UI\nTrace abc123... の詳細"]
+    JAEGER -- "Logs タブ" --> LOG
+```
+
+- **Loki → Jaeger**: ログの `trace_id` フィールドをクリックすると該当トレースに飛ぶ
+- **Jaeger → Loki**: トレース画面の Logs タブから同一 Trace ID のログを参照できる（`jaeger.yaml` の `tracesToLogsV2` 設定）
 
 ### PSR-3 → OTel Severity マッピング
 
@@ -258,6 +278,7 @@ sequenceDiagram
     participant Col as OTel Collector
     participant Jaeger as Jaeger
     participant Prom as Prometheus
+    participant Loki as Loki
     participant Grafana as Grafana
 
     Client->>PHP: HTTP Request
@@ -291,9 +312,12 @@ sequenceDiagram
 
     Col->>Jaeger: Traces 転送
     Col->>Prom: Metrics 公開 (Prometheus scrape)
-    Col->>Col: Logs → stdout (JSON)
+    Col->>Loki: Logs 転送 (OTLP HTTP)
+    Col->>Col: Logs → stdout (debug exporter)
 
     Prom->>Grafana: メトリクスデータ提供
+    Loki->>Grafana: ログデータ提供
+    Jaeger->>Grafana: トレースデータ提供
 ```
 
 ---
@@ -391,6 +415,10 @@ graph LR
             PRO[Prometheus]
         end
 
+        subgraph "loki :3100"
+            LOK[Loki]
+        end
+
         subgraph "grafana :3000"
             GRA[Grafana]
         end
@@ -400,6 +428,19 @@ graph LR
 
     COL -- "gRPC :4317\nTraces" --> JAE
     COL -- "Prometheus Scrape\n:8889/metrics" --> PRO
+    COL -- "OTLP HTTP :3100\nLogs" --> LOK
     PRO -- "DataSource" --> GRA
     JAE -- "DataSource" --> GRA
+    LOK -- "DataSource" --> GRA
 ```
+
+### サービス一覧
+
+| サービス | ポート | 役割 |
+|---------|-------|------|
+| `php-app` | 8080 | PHP アプリケーション |
+| `otel-collector` | 4317 / 4318 / 8889 | テレメトリ集約・転送 |
+| `jaeger` | 16686 | 分散トレーシング可視化 |
+| `prometheus` | 9090 | メトリクス保存・クエリ |
+| `loki` | 3100 | ログ保存・クエリ |
+| `grafana` | 3000 | 統合可視化ダッシュボード |
