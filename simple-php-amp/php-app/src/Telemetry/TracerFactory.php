@@ -42,7 +42,14 @@ class TracerFactory
         // CollectorにHTTPでトレースを送信する。エンドポイントは /v1/traces
         $baseEndpoint = getenv('OTEL_EXPORTER_OTLP_ENDPOINT') ?: 'http://otel-collector:4318';
         $endpoint  = HttpEndpointResolver::create()->resolveToString($baseEndpoint, Signals::TRACE);
-        $transport = (new OtlpHttpTransportFactory())->create($endpoint, ContentTypes::PROTOBUF);
+        $headers = [];
+        foreach (explode(',', getenv('OTEL_EXPORTER_OTLP_HEADERS') ?: '') as $pair) {
+            if (str_contains($pair, '=')) {
+                [$key, $value] = explode('=', $pair, 2);
+                $headers[trim($key)] = trim($value);
+            }
+        }
+        $transport = (new OtlpHttpTransportFactory())->create($endpoint, ContentTypes::PROTOBUF, $headers);
         $exporter  = new SpanExporter($transport);
 
         // 2. BatchSpanProcessor - Spanを溜めて効率的に送信
