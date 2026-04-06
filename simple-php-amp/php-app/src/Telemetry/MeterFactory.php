@@ -40,7 +40,14 @@ class MeterFactory
         // CollectorにHTTPでメトリクスを送信する。エンドポイントは /v1/metrics
         $baseEndpoint = getenv('OTEL_EXPORTER_OTLP_ENDPOINT') ?: 'http://otel-collector:4318';
         $endpoint  = HttpEndpointResolver::create()->resolveToString($baseEndpoint, Signals::METRICS);
-        $transport = (new OtlpHttpTransportFactory())->create($endpoint, ContentTypes::PROTOBUF);
+        $headers = [];
+        foreach (explode(',', getenv('OTEL_EXPORTER_OTLP_HEADERS') ?: '') as $pair) {
+            if (str_contains($pair, '=')) {
+                [$key, $value] = explode('=', $pair, 2);
+                $headers[trim($key)] = trim($value);
+            }
+        }
+        $transport = (new OtlpHttpTransportFactory())->create($endpoint, ContentTypes::PROTOBUF, $headers);
         $exporter  = new MetricExporter($transport);
 
         // 2. ExportingReader - 定期的にメトリクスをエクスポート

@@ -41,7 +41,14 @@ class LoggerFactory
         // CollectorにHTTPでログを送信する。エンドポイントは /v1/logs
         $baseEndpoint = getenv('OTEL_EXPORTER_OTLP_ENDPOINT') ?: 'http://otel-collector:4318';
         $endpoint  = HttpEndpointResolver::create()->resolveToString($baseEndpoint, Signals::LOGS);
-        $transport = (new OtlpHttpTransportFactory())->create($endpoint, ContentTypes::PROTOBUF);
+        $headers = [];
+        foreach (explode(',', getenv('OTEL_EXPORTER_OTLP_HEADERS') ?: '') as $pair) {
+            if (str_contains($pair, '=')) {
+                [$key, $value] = explode('=', $pair, 2);
+                $headers[trim($key)] = trim($value);
+            }
+        }
+        $transport = (new OtlpHttpTransportFactory())->create($endpoint, ContentTypes::PROTOBUF, $headers);
         $exporter  = new LogsExporter($transport);
 
         // 2. BatchLogRecordProcessor - ログを溜めて効率的に送信
