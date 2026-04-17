@@ -75,10 +75,10 @@ class TodoRepository
             // DB属性を記録（OpenTelemetry Semantic Conventions）
             $span->setAttribute('db.system', 'sqlite');
             $span->setAttribute('db.name', 'todos.db');
-            $span->setAttribute('db.statement', 'SELECT * FROM todos ORDER BY created_at DESC');
+            $span->setAttribute('db.statement', 'SELECT * FROM todos ORDER BY id DESC');
 
             // クエリ実行
-            $stmt = $this->db->query('SELECT * FROM todos ORDER BY created_at DESC');
+            $stmt = $this->db->query('SELECT * FROM todos ORDER BY id DESC');
             $todos = $stmt->fetchAll(\PDO::FETCH_ASSOC);
 
             // 結果を属性に記録（デバッグ用）
