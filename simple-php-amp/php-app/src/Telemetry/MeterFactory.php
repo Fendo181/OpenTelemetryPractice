@@ -22,7 +22,7 @@ use OpenTelemetry\API\Signals;
  *
  * 実装するメトリクス:
  * - Counter: http.requests.total（リクエスト数、エンドポイント別）
- * - Histogram: http.request.duration（レスポンスタイムの分布）
+ * - Histogram: http.server.request.duration（レスポンスタイムの分布）
  * - Gauge: process.memory.usage（PHPメモリ使用量）
  *
  * PHPerKaigi 2026デモ用
