@@ -1,0 +1,14 @@
+{
+  "name": "demo-pattern-b",
+  "version": "1.0.0",
+  "description": "Hybrid Agentパターン: New Relic Agent + OTel API",
+  "main": "app.js",
+  "scripts": {
+    "start": "node -r newrelic app.js"
+  },
+  "dependencies": {
+    "@opentelemetry/api": "^1.9.0",
+    "express": "^4.21.2",
+    "newrelic": "^13.13.0"
+  }
+}
