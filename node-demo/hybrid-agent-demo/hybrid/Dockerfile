@@ -1,4 +1,4 @@
-# patternB: Hybrid Agent パターン用 Dockerfile
+# hybrid: Hybrid Agent パターン用 Dockerfile
 FROM node:20-alpine
 
 # 作業ディレクトリを設定する

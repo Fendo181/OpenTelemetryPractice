@@ -1,14 +1,14 @@
 # ============================================================
-# docker-compose.patternA.yml
-# パターンA: 純粋 OTel パターン（OTel SDK + OTLP 直送）
-# 起動: docker compose -f docker-compose.patternA.yml up --build
+# docker-compose.hybrid.yml
+# Hybrid パターン: Hybrid Agent パターン（New Relic Agent + OTel API）
+# 起動: docker compose -f docker-compose.hybrid.yml up --build
 # ============================================================
 
 services:
-  # メインアプリケーション（OTel SDK で計装）
-  app-pattern-a:
+  # メインアプリケーション（New Relic Hybrid Agent で計装）
+  app-hybrid:
     build:
-      context: ./patternA
+      context: ./hybrid
     # コンテナ内では "app" という名前で参照できるようにエイリアスを設定する
     # loadgen が http://app:3000 で接続できるようにするため
     networks:
@@ -16,14 +16,16 @@ services:
         aliases:
           - app
     ports:
-      - "3001:3000"
+      - "3002:3000"
     environment:
       # New Relic へのデータ送信に必要なライセンスキー（.env から読み込む）
-      - NEW_RELIC_LICENSE_KEY=${NEW_RELIC_LICENSE_KEY}
-      # New Relic UI に表示されるサービス名
-      - OTEL_SERVICE_NAME=demo-pattern-a
+      - NEW_RELIC_LICENSE_KEY=${NEW_RELIC_LICENSE_KEY_HYBRID}
+      # New Relic APM UI に表示されるアプリケーション名
+      - NEW_RELIC_APP_NAME=demo-hybrid
+      # Hybrid Agent の有効化: これにより NR Agent が OTel API のブリッジとして機能する
+      - NEW_RELIC_OPENTELEMETRY_ENABLED=true
       # パターン識別用ラベル（/ エンドポイントのレスポンスに含まれる）
-      - PATTERN_LABEL=A
+      - PATTERN_LABEL=Hybrid
       - NODE_ENV=production
 
   # 負荷生成コンテナ（全エンドポイントに定期リクエスト）
@@ -31,8 +33,8 @@ services:
     build:
       context: ./loadgen
     depends_on:
-      - app-pattern-a
-    # loadgen は app-pattern-a と同じネットワークに接続する
+      - app-hybrid
+    # loadgen は app-hybrid と同じネットワークに接続する
     networks:
       - default
     environment:

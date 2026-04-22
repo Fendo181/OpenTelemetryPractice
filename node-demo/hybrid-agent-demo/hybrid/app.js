@@ -1,9 +1,9 @@
 'use strict';
 
 // ============================================================
-// app.js - patternB（Hybrid Agent）メインアプリ
+// app.js - Hybrid（Hybrid Agent）メインアプリ
 //
-// ※ patternA と patternB の app.js は完全に同一のコードです
+// ※ otel-only と hybrid の app.js は完全に同一のコードです
 //    違いは初期化ファイル（tracing.js / newrelic.js）のみ
 //
 // OTel API はここで使用するが、OTel SDK はここでは読み込まない
@@ -17,7 +17,7 @@ const app = express();
 const PORT = 3000;
 
 // どちらのパターンで動作しているかを環境変数から判定する
-const PATTERN = process.env.PATTERN_LABEL || 'B';
+const PATTERN = process.env.PATTERN_LABEL || 'Hybrid';
 
 // OTel トレーサーを取得する（SDK または NR Agent が背後でブリッジする）
 const tracer = trace.getTracer('demo-app', '1.0.0');

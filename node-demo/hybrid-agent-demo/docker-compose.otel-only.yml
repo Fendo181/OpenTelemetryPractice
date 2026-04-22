@@ -1,14 +1,14 @@
 # ============================================================
-# docker-compose.patternB.yml
-# パターンB: Hybrid Agent パターン（New Relic Agent + OTel API）
-# 起動: docker compose -f docker-compose.patternB.yml up --build
+# docker-compose.otel-only.yml
+# OtelOnly パターン: 純粋 OTel パターン（OTel SDK + OTLP 直送）
+# 起動: docker compose -f docker-compose.otel-only.yml up --build
 # ============================================================
 
 services:
-  # メインアプリケーション（New Relic Hybrid Agent で計装）
-  app-pattern-b:
+  # メインアプリケーション（OTel SDK で計装）
+  app-otel-only:
     build:
-      context: ./patternB
+      context: ./otel-only
     # コンテナ内では "app" という名前で参照できるようにエイリアスを設定する
     # loadgen が http://app:3000 で接続できるようにするため
     networks:
@@ -16,16 +16,14 @@ services:
         aliases:
           - app
     ports:
-      - "3002:3000"
+      - "3001:3000"
     environment:
       # New Relic へのデータ送信に必要なライセンスキー（.env から読み込む）
-      - NEW_RELIC_LICENSE_KEY=${NEW_RELIC_LICENSE_KEY}
-      # New Relic APM UI に表示されるアプリケーション名
-      - NEW_RELIC_APP_NAME=demo-pattern-b
-      # Hybrid Agent の有効化: これにより NR Agent が OTel API のブリッジとして機能する
-      - NEW_RELIC_OPENTELEMETRY_ENABLED=true
+      - NEW_RELIC_LICENSE_KEY=${NEW_RELIC_LICENSE_KEY_OTEL_ONLY}
+      # New Relic UI に表示されるサービス名
+      - OTEL_SERVICE_NAME=demo-otel-only
       # パターン識別用ラベル（/ エンドポイントのレスポンスに含まれる）
-      - PATTERN_LABEL=B
+      - PATTERN_LABEL=OtelOnly
       - NODE_ENV=production
 
   # 負荷生成コンテナ（全エンドポイントに定期リクエスト）
@@ -33,8 +31,8 @@ services:
     build:
       context: ./loadgen
     depends_on:
-      - app-pattern-b
-    # loadgen は app-pattern-b と同じネットワークに接続する
+      - app-otel-only
+    # loadgen は app-otel-only と同じネットワークに接続する
     networks:
       - default
     environment:

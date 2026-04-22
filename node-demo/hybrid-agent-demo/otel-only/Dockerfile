@@ -1,4 +1,4 @@
-# patternA: 純粋 OTel パターン用 Dockerfile
+# otel-only: 純粋 OTel パターン用 Dockerfile
 FROM node:20-alpine
 
 # 作業ディレクトリを設定する
