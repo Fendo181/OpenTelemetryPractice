@@ -57,70 +57,78 @@ app.get('/order', async (req, res) => {
   const amount = randomInt(100, 9999);
   const startTime = Date.now();
 
-  // ルートスパン: 注文処理全体をラップする
-  await tracer.startActiveSpan('order.process', async (rootSpan) => {
-    try {
-      // ルートスパンに注文の共通属性を付与する
-      rootSpan.setAttributes({
-        'order.id': orderId,
-        'customer.type': customerType,
-        'order.amount': amount,
-      });
-
-      // --- フェーズ1: バリデーション（50ms）---
-      await tracer.startActiveSpan('order.validate', async (validateSpan) => {
-        validateSpan.setAttributes({
+  // 外側の try/catch: Express 4.x は非同期エラーを自動捕捉しないため
+  // 明示的にレスポンスを返してスタックトレースの漏洩を防ぐ
+  try {
+    // ルートスパン: 注文処理全体をラップする
+    await tracer.startActiveSpan('order.process', async (rootSpan) => {
+      try {
+        // ルートスパンに注文の共通属性を付与する
+        rootSpan.setAttributes({
           'order.id': orderId,
           'customer.type': customerType,
           'order.amount': amount,
         });
-        // バリデーション処理を模倣する
-        await sleep(50);
-        validateSpan.end();
-      });
 
-      // --- フェーズ2: DB 書き込み（100ms）---
-      await tracer.startActiveSpan('order.db.insert', async (dbSpan) => {
-        dbSpan.setAttributes({
-          'order.id': orderId,
-          'customer.type': customerType,
-          'order.amount': amount,
-          // DB 操作であることを示す属性
-          'db.system': 'postgresql',
-          'db.operation': 'INSERT',
+        // --- フェーズ1: バリデーション（50ms）---
+        await tracer.startActiveSpan('order.validate', async (validateSpan) => {
+          validateSpan.setAttributes({
+            'order.id': orderId,
+            'customer.type': customerType,
+            'order.amount': amount,
+          });
+          // バリデーション処理を模倣する
+          await sleep(50);
+          validateSpan.end();
         });
-        // DB 書き込みを模倣する
-        await sleep(100);
-        dbSpan.end();
-      });
 
-      // --- フェーズ3: 外部通知 API（80ms）---
-      await tracer.startActiveSpan('order.notify', async (notifySpan) => {
-        notifySpan.setAttributes({
-          'order.id': orderId,
-          'customer.type': customerType,
-          'order.amount': amount,
-          // 外部 HTTP 呼び出しを示す属性
-          'http.method': 'POST',
-          'peer.service': 'notification-service',
+        // --- フェーズ2: DB 書き込み（100ms）---
+        await tracer.startActiveSpan('order.db.insert', async (dbSpan) => {
+          dbSpan.setAttributes({
+            'order.id': orderId,
+            'customer.type': customerType,
+            'order.amount': amount,
+            // DB 操作であることを示す属性
+            'db.system': 'postgresql',
+            'db.operation': 'INSERT',
+          });
+          // DB 書き込みを模倣する
+          await sleep(100);
+          dbSpan.end();
         });
-        // 外部通知 API 呼び出しを模倣する
-        await sleep(80);
-        notifySpan.end();
-      });
 
-      const duration = Date.now() - startTime;
-      rootSpan.end();
+        // --- フェーズ3: 外部通知 API（80ms）---
+        await tracer.startActiveSpan('order.notify', async (notifySpan) => {
+          notifySpan.setAttributes({
+            'order.id': orderId,
+            'customer.type': customerType,
+            'order.amount': amount,
+            // 外部 HTTP 呼び出しを示す属性
+            'http.method': 'POST',
+            'peer.service': 'notification-service',
+          });
+          // 外部通知 API 呼び出しを模倣する
+          await sleep(80);
+          notifySpan.end();
+        });
 
-      res.json({ orderId, customerType, amount, duration_ms: duration });
-    } catch (err) {
-      // 予期しないエラーをスパンに記録してから再スローする
-      rootSpan.recordException(err);
-      rootSpan.setStatus({ code: SpanStatusCode.ERROR, message: err.message });
-      rootSpan.end();
-      throw err;
+        const duration = Date.now() - startTime;
+        rootSpan.end();
+
+        res.json({ orderId, customerType, amount, duration_ms: duration });
+      } catch (err) {
+        // 予期しないエラーをスパンに記録してから再スローする
+        rootSpan.recordException(err);
+        rootSpan.setStatus({ code: SpanStatusCode.ERROR, message: err.message });
+        rootSpan.end();
+        throw err;
+      }
+    });
+  } catch (err) {
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Internal Server Error' });
     }
-  });
+  }
 });
 
 // -----------------------------------------------------------
@@ -150,6 +158,16 @@ app.get('/error', async (req, res) => {
       });
     }
   });
+});
+
+// -----------------------------------------------------------
+// グローバルエラーハンドラー
+// Express のデフォルトエラーハンドラーはスタックトレースを含む HTML を返す場合があるため
+// 汎用的なエラーレスポンスを返してクライアントへの情報漏洩を防ぐ
+// -----------------------------------------------------------
+// eslint-disable-next-line no-unused-vars
+app.use((err, req, res, next) => {
+  res.status(500).json({ error: 'Internal Server Error' });
 });
 
 // -----------------------------------------------------------
