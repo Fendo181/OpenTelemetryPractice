@@ -4,6 +4,8 @@
 # 起動: docker compose -f docker-compose.otel-only.yml up --build
 # ============================================================
 
+name: otel-only
+
 services:
   # メインアプリケーション（OTel SDK で計装）
   app-otel-only:

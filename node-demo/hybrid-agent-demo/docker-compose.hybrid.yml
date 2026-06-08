@@ -4,6 +4,8 @@
 # 起動: docker compose -f docker-compose.hybrid.yml up --build
 # ============================================================
 
+name: hybrid
+
 services:
   # メインアプリケーション（New Relic Hybrid Agent で計装）
   app-hybrid:
