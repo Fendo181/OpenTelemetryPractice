@@ -62,18 +62,18 @@ class TelemetryMiddleware
             // HTTP属性をSpanに記録
             // OpenTelemetry Semantic Conventions に従った属性名
             // https://opentelemetry.io/docs/specs/semconv/http/
-            $span->setAttribute('http.method', $method);
+            $span->setAttribute('http.request.method', $method);
             $span->setAttribute('http.route', $path);
-            $span->setAttribute('http.scheme', $_SERVER['REQUEST_SCHEME'] ?? 'http');
-            $span->setAttribute('http.target', $_SERVER['REQUEST_URI'] ?? $path);
-            $span->setAttribute('http.user_agent', $_SERVER['HTTP_USER_AGENT'] ?? '');
+            $span->setAttribute('url.scheme', $_SERVER['REQUEST_SCHEME'] ?? 'http');
+            $span->setAttribute('url.path', $_SERVER['REQUEST_URI'] ?? $path);
+            $span->setAttribute('user_agent.original', $_SERVER['HTTP_USER_AGENT'] ?? '');
 
             // ビジネスロジック実行（TodoHandlerなど）
             $response = $next();
 
             // HTTPステータスコードをSpanに記録
             $statusCode = http_response_code();
-            $span->setAttribute('http.status_code', $statusCode);
+            $span->setAttribute('http.response.status_code', $statusCode);
 
             // ステータスコードが4xx/5xxの場合、Spanをエラーとしてマーク
             if ($statusCode >= 400) {
@@ -132,14 +132,21 @@ class TelemetryMiddleware
         // Histogram: レスポンスタイムの分布
         // P50/P95/P99などのパーセンタイルが計算できる
         $histogram = $meter->createHistogram(
-            'http.request.duration',
+            'http.server.request.duration',
             'ms',
             'HTTP request duration'
         );
-        $histogram->record($duration, [
-            'http.method' => $method,
+
+        $histogramAttributes = [
+            'http.request.method' => $method,
+            'http.response.status_code' => $statusCode,
             'http.route' => $path,
-        ]);
+        ];
+        if ($statusCode >= 400) {
+            $histogramAttributes['error.type'] = self::getErrorType($statusCode);
+        }
+
+        $histogram->record($duration, $histogramAttributes);
     }
 
     /**
